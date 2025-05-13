@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Vehicle Profit Calculator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      margin: 0;
+      background-color: #f9f9f9;
+    }
+
+    h2 {
+      text-align: center;
+    }
+
+    label, input, select, button {
+      display: block;
+      width: 100%;
+      max-width: 500px;
+      margin: 10px auto;
+      font-size: 1rem;
+    }
+
+    button {
+      padding: 10px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+
+    #result {
+      margin-top: 30px;
+      overflow-x: auto;
+    }
+
+    canvas {
+      max-width: 100% !important;
+    }
+  </style>
+</head>
+<body>
+  <h2>Savings Calculator (5 Years)</h2>
+
+  <label>Select Business Type:</label>
+  <select id="businessType" onchange="calculateProfits()">
+    <option value="watercans">Water Cans</option>
+    <option value="vegetablecrates">Vegetable Crates</option>
+    <option value="gasTransport">Gas Transport</option>
+    <option value="cementTransport">Cement Transport</option>
+    <option value="fmcg">FMCG</option>
+    <option value="eCommerce">E-Commerce</option>
+    <option value="plywood">Plywood</option>
+  </select>
+
+  <label>Earnings per km (₹):</label>
+  <input id="earnPerKm" type="number" value="20" onchange="calculateProfits()" />
+
+  <label>Kilometers per trip:</label>
+  <input id="kmPerTrip" type="number" value="75" onchange="calculateProfits()" />
+
+  <label>Trips per day:</label>
+  <input id="tripsPerDay" type="number" value="2" onchange="calculateProfits()" />
+
+  <button onclick="calculateProfits()">Calculate</button>
+
+  <div id="result"></div>
+
+  <script>
+    function calculateProfits() {
+      const dieselPrice = 90.99;
+      const daysPerMonth = 25;
+      const months = 60;
+      
+      let earnPerKm = parseFloat(document.getElementById("earnPerKm").value);
+      let kmPerTrip = parseFloat(document.getElementById("kmPerTrip").value);
+      let tripsPerDay = parseFloat(document.getElementById("tripsPerDay").value);
+      
+    
+
+      const businessType = document.getElementById("businessType").value;
+      const kmPerDay = kmPerTrip * tripsPerDay;
+
+      // DEF cost calculation for Veero V2
+      const defOilPerDay = (kmPerDay / 500) * 86;
+      const defOilPerMonth = defOilPerDay * daysPerMonth;
+      const dynamicDefCost = (defOilPerMonth * months) - (54*86);
+      
+      const businessUnitRatios = {
+        "watercans":    { "Veero V2": 120, "Intra V30": 108, "AL Dost Plus": 108 },
+        "vegetablecrates": { "Veero V2": 60, "Intra V30": 48, "AL Dost Plus": 48 },
+        "gasTransport":    { "Veero V2": 90, "Intra V30": 80, "AL Dost Plus": 80 },
+        "cementTransport": { "Veero V2": 96, "Intra V30": 90, "AL Dost Plus": 90 },
+        "fmcg":            { "Veero V2": 180, "Intra V30": 160, "AL Dost Plus": 160 },
+        "eCommerce":       { "Veero V2": 80, "Intra V30": 72, "AL Dost Plus": 72 },
+        "plywood":         { "Veero V2": 88, "Intra V30": 76, "AL Dost Plus": 76 }
+      };
+      
+      const vehicleUnits = businessUnitRatios[businessType];
+
+      const vehicles = [
+        {
+          name: "Veero V2",
+          mileage: 18.4,
+          units: vehicleUnits["Veero V2"],
+          defCost: dynamicDefCost,
+          maintenance: (6000 * 16) - (800 * 4),
+          emi: 19563 * months,
+        },
+        {
+          name: "Intra V30",
+          mileage: 17,
+          units: vehicleUnits["Intra V30"],
+          defCost: 0,
+          maintenance: 6500 * 16,
+          emi: 19298 * months,
+        },
+        {
+          name: "AL Dost Plus",
+          mileage: 16.4,
+          units: vehicleUnits["AL Dost Plus"],
+          defCost: 0,
+          maintenance: 6500 * 16,
+          emi: 18953 * months,
+        }
+      ];
+
+      
+      if (isNaN(earnPerKm) || isNaN(kmPerTrip) || isNaN(tripsPerDay)) {
+        document.getElementById("result").innerHTML = "<p>Please enter all valid values.</p>";
+        return;
+      }
+
+      let table = `
+        <style>
+          .result-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-family: Arial, sans-serif;
+            border: 1px solid #ddd;
+          }
+          .result-table th, .result-table td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: center;
+          }
+          .result-table th {
+            background-color: #f2f2f2;
+            color: #333;
+          }
+          .highlight {
+            background-color: #d1ffd6;
+            font-weight: bold;
+          }
+        </style>
+        <table class='result-table'>
+          <thead>
+            <tr>
+              <th>Vehicle</th>
+              <th>Daily Earnings (₹)</th>
+              <th>5-Year Earnings (₹)</th>
+              <th>5-Year Costs (₹)</th>
+              <th>5-Year Profit (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      let bestNet = -Infinity;
+      let bestVehicle = "";
+      let graphData = {
+        labels: ["Year 1", "Year 2", "Year 3", "Year 4", "Year 5"],
+        datasets: []
+      };
+
+      let explanations = `
+        <div style="font-family: Arial, sans-serif; margin-top: 30px; line-height: 1.6;">
+          <h4>Explanation with Calculations:</h4>
+      `;
+
+      vehicles.forEach(v => {
+        // Calculate the total kilometers per day for the vehicle
+        const totalKmPerDay = kmPerTrip * tripsPerDay;
+        
+        // Calculate fuel cost per day for the vehicle (based on mileage and diesel price)
+        const fuelCostPerDay = (totalKmPerDay / v.mileage) * dieselPrice;
+    
+        // Calculate fuel cost per month for the vehicle
+        const fuelCostPerMonth = fuelCostPerDay * daysPerMonth; 
+    
+        const intraUnits = vehicleUnits["Intra V30"];
+        const earningPerDay = earnPerKm * kmPerTrip * tripsPerDay * (v.units / intraUnits);
+
+        // Calculate monthly earnings
+        const monthlyEarnings = earningPerDay * daysPerMonth;
+    
+        // Calculate gross earnings over 5 years
+        const gross5YrEarnings = Math.floor(monthlyEarnings * months);
+    
+        // Calculate total cost (including vehicle cost, maintenance, EMI, and fuel cost)
+        const fuelCost5Years = fuelCostPerMonth * months;
+        
+        const totalCost = v.defCost + v.maintenance + v.emi + fuelCost5Years;
+        // Calculate net profit (gross earnings - total cost)
+        const netProfit = gross5YrEarnings - totalCost;
+        if (netProfit > bestNet) {
+          bestNet = netProfit;
+          bestVehicle = v.name;
+        }
+
+        let yearlyProfits = [];
+        for (let year = 1; year <= 5; year++) {
+          const yearlyProfit = (earningPerDay * daysPerMonth * 12 * year) - v.defCost - (v.maintenance * year) - v.emi;
+          yearlyProfits.push(yearlyProfit);
+        }
+
+        let borderColor = '';
+        let lineStyle = [];
+
+        if (v.name === 'Veero V2') {
+          borderColor = '#28a745';
+          lineStyle = [0];
+        } else if (v.name === 'Intra V30') {
+          borderColor = '#007bff';
+          lineStyle = [5, 5];
+        } else if (v.name === 'AL Dost Plus') {
+          borderColor = '#ff6347';
+          lineStyle = [10, 5];
+        }
+
+        graphData.datasets.push({
+          label: v.name,
+          data: yearlyProfits,
+          borderColor: borderColor,
+          backgroundColor: 'rgba(0, 123, 255, 0.1)',
+          fill: false,
+          tension: 0.4,
+          borderWidth: 3,
+          borderDash: lineStyle,
+          pointRadius: 5,
+          pointBackgroundColor: '#ff0000',
+          pointHoverRadius: 6,
+          pointHoverBackgroundColor: '#ff5733'
+        });
+
+        table += `
+          <tr class="${v.name === bestVehicle ? 'highlight' : ''}">
+            <td>${v.name}</td>
+            <td>₹${Math.round(earningPerDay)}</td>
+
+            <td>₹${gross5YrEarnings.toLocaleString()}</td>
+
+            <td>₹${Math.round(totalCost).toLocaleString()}</td>
+
+            <td>₹${Math.round(netProfit).toLocaleString()}</td>
+
+          </tr>
+        `;
+        explanations += `
+          <h5>${v.name}</h5>
+          <ul>
+            <li><strong>Costs:</strong>
+              <ul>
+                <li>Daily kilometers: ${kmPerTrip} km/trip × ${tripsPerDay} trips/day = <strong>${totalKmPerDay} km/day</strong></li>
+                <li>Fuel cost/day: ${totalKmPerDay} ÷ ${v.mileage} × ₹${dieselPrice} = <strong>₹${Math.round(fuelCostPerDay)}</strong></li>
+                <li>Fuel cost/month: ₹${Math.round(fuelCostPerDay)} × ${daysPerMonth} = <strong>₹${Math.round(fuelCostPerMonth)}</strong></li>
+                <li>Fuel cost (5 yrs): ₹${Math.round(fuelCostPerMonth)} × ${months} = <strong>₹${Math.round(fuelCost5Years).toLocaleString()}</strong></li>
+                
+                <li>DEF cost (5 yrs): <strong>₹${v.defCost.toLocaleString()}</strong></li>
+                  <small>(${v.name === 'Veero V2' ? 'Daily kilometers x 25 x 60 × 86 - (54 × 86)': 'No DEF oil'})</small>
+                <li>Maintenance (5 yrs): <strong>₹${v.maintenance.toLocaleString()}</strong><br>
+                  <small>(${v.name === 'Veero V2' ? '6000 × 16 - (800 × 4)' : '6500 × 16'})</small>
+                </li>
+                <li>EMI (5 yrs): <strong>₹${v.emi.toLocaleString()}</strong></li>
+                
+                <li><strong>Total 5-Year Cost:</strong> ₹${v.defCost.toLocaleString()} + ₹${v.maintenance.toLocaleString()} + ₹${v.emi.toLocaleString()} + ₹${Math.round(fuelCost5Years).toLocaleString()} = <strong>₹${Math.round(totalCost).toLocaleString()}</strong></li>
+
+              </ul>
+            </li>
+            <li><strong>Earnings:</strong>
+              <ul>
+                <li>Daily earnings: ₹${earnPerKm} × ${kmPerTrip} × ${tripsPerDay} × (${v.units} / ${intraUnits}) = <strong>₹${Math.round(earningPerDay)}</strong></li>
+                <li>Monthly earnings: ₹${Math.round(earningPerDay)} × ${daysPerMonth} = <strong>₹${Math.round(monthlyEarnings).toLocaleString()}</strong></li>
+                <li>5-Year Earnings: ₹${Math.round(monthlyEarnings)} × ${months} = <strong>₹${gross5YrEarnings.toLocaleString()}</strong></li>
+              </ul>
+            </li>
+            <li><strong>Net Profit:</strong> ₹${gross5YrEarnings.toLocaleString()} − ₹${Math.round(totalCost).toLocaleString()} = <strong style="color: green;">₹${Math.round(netProfit).toLocaleString()}</strong></li>
+          </ul>
+        `;
+
+      });
+
+      table += `
+        </tbody>
+      </table>`;
+
+      explanations += `</div>`;
+
+      document.getElementById("result").innerHTML = table + explanations;
+      createGraph(graphData);
+    }
+
+    function createGraph(graphData) {
+      const ctx = document.createElement('canvas');
+      document.getElementById('result').appendChild(ctx);
+      new Chart(ctx, {
+        type: 'line',
+        data: graphData,
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'top' },
+            tooltip: { enabled: true }
+          },
+          scales: {
+            x: {
+              title: { display: true, text: 'Years' },
+              ticks: { beginAtZero: true }
+            },
+            y: {
+              title: { display: true, text: '₹ Amount' },
+              ticks: { beginAtZero: true }
+            }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
